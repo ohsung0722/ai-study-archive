@@ -1,0 +1,26 @@
+{
+  "files": [
+    "basics.md",
+    "training.md",
+    "cnn.md",
+    "rnn.md",
+    "nlp.md",
+    "opencv.md",
+    "resnet.md",
+    "detection.md",
+    "segpose.md",
+    "vit.md"
+  ],
+  "notes": [
+    "notes/basics.md",
+    "notes/training.md",
+    "notes/cnn.md",
+    "notes/rnn.md",
+    "notes/nlp.md",
+    "notes/opencv.md",
+    "notes/resnet.md",
+    "notes/detection.md",
+    "notes/segpose.md",
+    "notes/vit.md"
+  ]
+}
