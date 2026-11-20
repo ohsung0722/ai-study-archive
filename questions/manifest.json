@@ -9,7 +9,8 @@
     "resnet.md",
     "detection.md",
     "segpose.md",
-    "vit.md"
+    "vit.md",
+    "llm.md"
   ],
   "notes": [
     "notes/basics.md",
@@ -21,6 +22,7 @@
     "notes/resnet.md",
     "notes/detection.md",
     "notes/segpose.md",
-    "notes/vit.md"
+    "notes/vit.md",
+    "notes/llm.md"
   ]
 }
