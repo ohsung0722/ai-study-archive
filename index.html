@@ -298,8 +298,8 @@ main { min-width: 0; }
       <span class="count" id="total-count"></span>
     </div>
     <nav class="modes" id="modes" role="tablist" aria-label="보기 전환">
-      <button class="mode-btn" type="button" role="tab" data-mode="qa" aria-selected="true">면접 질문</button>
-      <button class="mode-btn" type="button" role="tab" data-mode="notes" aria-selected="false">개념 노트</button>
+      <button class="mode-btn" type="button" role="tab" data-mode="notes" aria-selected="true">개념 노트</button>
+      <button class="mode-btn" type="button" role="tab" data-mode="qa" aria-selected="false">면접 질문</button>
     </nav>
     <label class="search" for="q-search">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -877,7 +877,7 @@ main { min-width: 0; }
     renderAll();
     renderNotes();
     wireControls();
-    setMode(load(MODE_KEY, "qa"));
+    setMode(load(MODE_KEY, "notes"));
     if (location.hash) goTo(decodeURIComponent(location.hash.slice(1)));
   }
   boot();
