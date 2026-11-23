@@ -1,4 +1,4 @@
-# 멀티모달
+# Multimodal
 blog: multimodal_blog/llm_day2_blog.md
 blog_title: [LLM 2일차] 보고, 그리고, 듣고, 말하는 AI: OpenAI 멀티모달 API
 
