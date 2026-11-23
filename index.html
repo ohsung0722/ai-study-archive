@@ -192,6 +192,8 @@ main { min-width: 0; }
 .md p, .md ul, .md ol { margin: 0 0 10px; }
 .md ul, .md ol { padding-left: 1.3em; }
 .md li { margin: 2px 0; }
+.md > ul > li + li, .md > ol > li + li { margin-top: 9px; }
+.md li > ul, .md li > ol { margin: 4px 0 0; }
 .md strong { font-weight: 600; }
 .md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); border-radius: 4px; padding: 1px 5px; }
 .md pre { background: var(--code-bg); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0 0 12px; line-height: 1.55; }

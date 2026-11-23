@@ -183,56 +183,78 @@ related: mm-audio-api, mm-sound-representation
 ### TTS: 텍스트를 음성으로 변환
 related: mm-tts
 핵심: TTS는 입력된 텍스트를 자연스러운 음성으로 변환하는 기술. Audio API의 `audio.speech.create`를 사용하면 텍스트를 음성으로 생성하고, 목소리와 말투, 속도 등 조절 가능
-- `client.audio.speech.create(model="gpt-4o-mini-tts", voice="alloy", input="안녕하세요, 좋은 날씨예요!")` → `speech.write_to_file("speech.mp3")`
-- 이미지와 달리 Base64 디코딩이 없다. API마다 결과 모양이 다르다는 것을 기억해 둔다.
-- 오디오 출력 1M 토큰당 gpt-audio-1.5·gpt-audio $64, gpt-audio-mini $20, **gpt-4o-mini-tts $12**
+- 음성 생성 예시
+```py
+speech = client.audio.speech.create(
+    model="gpt-4o-mini-tts",
+    voice="alloy",
+    input="안녕하세요, 좋은 날씨예요!",
+    instructions="밝고 친근한 말투로 말해줘.",
+    speed=1.0,
+    response_format="mp3"
+)
+
+speech.write_to_file("speech.mp3")
+```
+- 이미지 생성 API와 달리 Base64 문자열을 디코딩할 필요 없이 파일로 저장 가능. 
 - `instructions`(최대 4096자): "차분한 뉴스 앵커처럼", "신난 아이처럼". `speed` 0.25~4.0: 60초 글이 0.25면 4분, 4.0이면 15초
 - input도 최대 4096자, voice는 alloy, coral, nova, marin, cedar 등, response_format은 mp3, opus, aac, flac, wav, pcm
-막힌 점: 입은 생겼다. 이제 귀, 사람의 말을 글로 받아 적는 쪽이다.
+막힌 점: STT 자세히 살펴보기.
 
-### Transcription: 소리를 글로
+### Transcription(STT): 음성을 텍스트로 변환
 related: mm-transcription-exp, mm-audio-file-size
-핵심: 오디오 파일을 `"rb"`로 열어 그대로 보내면 같은 언어의 글이 오고, 요금은 분 단위, 파일은 25MB까지다.
-- `client.audio.transcriptions.create(model="gpt-4o-mini-transcribe", file=audio)` → `transcription.text`
-- 실험(강의 결과): TTS로 만든 "안녕하세요, 좋은 날씨예요!"를 넣었더니 `'안녕하세요? 좋은 날씨예요?'`. 글자는 다 맞고 **문장부호가 틀렸다**. 문장부호는 억양에서 추측해야 하는 정보다.
-- 분당 가격: gpt-4o-transcribe·Whisper 약 $0.006, **gpt-4o-mini-transcribe $0.003**
+핵심: STT는 음성 파일을 입력받아 발화 내용을 텍스트로 변환하는 기술. Audio API의 `audio.transcriptions.create()`를 사용하며, 음성 파일을 바이너리 모드(rb)로 열어 전달하면 인식된 텍스트를 반환
+- 음성 인식 예시
+```py
+with open("speech.mp3", "rb") as audio:
+    transcription = client.audio.transcriptions.create(
+        model="gpt-4o-mini-transcribe",
+        file=audio
+    )
+
+print(transcription.text)
+```
+- 문장 부호는 억양에서 추측해야 하는 정보이기 때문에 정확도 떨어짐
 - 파일 한도 25MB(OpenAI 문서, 강의 자료에는 없음). CD 음질 WAV는 1분 약 10MB라 2분 반, 16kHz 모노는 1분 1.83MB라 약 14분, MP3 64kbps는 약 55분
-- 긴 회의 녹음은 음질을 인식에 필요한 만큼 낮추거나 압축하고, 그래도 넘으면 잘라서 보낸다.
-막힌 점: 같은 언어로 받아 적기는 된다. 그럼 다른 언어로 바로 옮겨 적는 Translation 모델을 쓰면 통역기가 완성될까?
+막힌 점: 음성을 다른 언어의 텍스트로 변환하는 Translation 기능은 어떻게 하는걸까
 
-### Translation과 그 한계
+### Audio Translation: 음성을 다른 언어로 번역
 related: mm-whisper-translation-exp
-핵심: 음성 번역 모델은 사실상 whisper-1뿐인데, 한국어 음성을 번역하지 않고 로마자로 받아 적는 등 실전에서 쓰기 어려웠다.
-- `client.audio.translations.create(model="whisper-1", file=audio)`
-- 결과(강의): `'Annyeonghaseyo. Oneuldo gungbuhagi cham joeun nalssi imnida. Modu himnae boahyo.'` 영어 번역이 아니라 발음을 로마자로 옮겼다.
-- 강의 평가: "조금 도태된 모델", 슬라이드 제목은 "Whisper는… 조금 실전에서 쓰기 어렵긴 하다"
+핵심: Audio Translation은 음성을 입력받아 다른 언어의 텍스트로 변환하는 기능. OpenAI의 `audio.translations.create()`는 whisper-1 모델을 사용하며, 다양한 언어의 음성을 영어 텍스트로 변환 가능. 
+- 평가: "조금 도태된 모델", 슬라이드 제목은 "Whisper는… 조금 실전에서 쓰기 어렵긴 하다"
 - 실시간 번역 모델(gpt-realtime-translate 등)은 2배에서 6배까지 비싸다.
-- 출력 언어: OpenAI 문서 기준으로 Audio Translation은 여러 언어 음성을 **영어로만** 번역한다. 강의 슬라이드의 "입력 70개 이상, 출력 13개 언어"와 다르니, 면접에서는 "영어로만"이라고 답하는 것이 안전하다(보충).
-막힌 점: 번역 전용 모델이 약하다면, 번역을 잘하는 다른 무언가에게 맡길 수는 없을까?
+- 출력 언어: OpenAI 문서 기준으로 Audio Translation은 여러 언어 음성을 **영어로만** 번역
+막힌 점: 번역 전용 모델이 약하다면, 대안은 없을까?
 
-### Transcription + LLM: 각자 잘하는 일만
+### Transcription + LLM: 음성 인식과 번역 분리
 related: mm-transcription-llm, mm-cascade-vs-realtime
-핵심: 받아쓰기 모델로 글을 만들고 LLM에게 번역시키면, 같은 음성에서 자연스러운 번역이 나오고 instructions로 말투까지 정할 수 있다.
-- 받아 적은 `transcription.text`를 `responses.create(input=..., instructions="너는 한영 번역가이다…")`에 넣었다.
-- 결과: `'Hello. It's a wonderfully pleasant day for studying today. Let's all keep our spirits up!'` whisper-1의 로마자와 비교하면 차이가 크다.
-- 이유 세 가지: 번역 모델은 영어로만 번역한다 / "비즈니스 영어로", "고유명사는 원어 그대로" 같은 말투 지정 / LLM은 이미 번역을 잘한다
-- 대가: 호출이 늘어 지연과 비용이 쌓이고, 받아쓰기 오류는 LLM이 그럴듯하게 번역해 감춘다. 보충: 글로 바꾸는 순간 목소리의 감정과 억양도 사라진다. 이걸 피하는 쪽이 Realtime API 같은 음성 직접 처리 모델이다.
-- 1일차의 `instructions`가 그대로 쓰인다. LLM이 가운데, 다른 모델은 입출력 장치다.
-막힌 점: 파이프라인은 짰다. 사람이 마이크에 대고 말하면 그 소리를 함수까지 가져올 화면이 필요하다.
+핵심: STT 모델로 음성을 텍스트로 변환한 후 LLM에 전달해 번역하는 방식. 각각 다른 모델에 맡기기 때문에 번역 언어와 말투 등 자유롭게 지정 가능
+- 구현 예시
+```py
+with open("speech.mp3", "rb") as audio:
+    transcription = client.audio.transcriptions.create(
+        model="gpt-4o-mini-transcribe",
+        file=audio
+    )
 
-### Gradio로 소리 주고받기
-related: mm-gradio-audio
-핵심: gr.Audio에 `sources`와 `type="filepath"`를 주면 함수가 녹음 파일 경로를 받고, 그 파일을 `"rb"`로 열어 그대로 전사 모델에 넘긴다.
-- `sources`: `["upload", "microphone"]` 중 필요한 것만. `type`: `"numpy"` 또는 `"filepath"`
-- 올린 소리는 파형으로 보이고 재생, 속도 조절, 자르기 버튼이 기본으로 붙는다.
-- 강의 예제: 마이크 → 버튼 → 전사 결과 Textbox. "마이크 테스트."라고 말한 게 그대로 찍혔다.
-- Colab 안에서는 사생활 노출 위험 때문에 마이크가 어렵다. `share=True`의 gradio.live 주소에서 테스트하고, 처음엔 권한 허용 후 껐다 다시 녹음한다.
-- 공개 링크는 누구나 들어와 내 API 키로 호출할 수 있으니 테스트 후 꺼 둔다.
-막힌 점: 부품이 모두 모였다. 이제 이걸 엮어 실제 앱을 만든다.
+response = client.responses.create(
+    model="gpt-4.1-mini",
+    instructions="너는 한영 번역가이다. 자연스러운 영어로 번역하고 번역문만 출력해.",
+    input=transcription.text
+)
 
-### 앱으로 엮기: LLM을 가운데 두고
+print(response.output_text)
+```
+- **한계**: 
+    - 처리시간과 API 비용 증가
+    - 오류 전파: STT에서 잘못 인식한 내용을 LLM이 그대로 번역하거나 오류가 드러나지 않게 감출 수 있음 
+    - 음성 정보 손실: 음성을 텍스트로 변환하는 과정에서 억양, 감정 등 비언어적 정보 손실
+막힌 점: 다양한 앱을 예시로 하여 아키텍쳐 생각해보기
+
+
+### Multimodal Application: LLM과 여러 모델 연결하기
 related: mm-proverb-quiz-exp, mm-artist-exp, mm-voice-apps-exp
-핵심: 네 실습 앱은 모두 "글"을 중간 형태로 삼아 Vision, 이미지 생성, 받아쓰기, LLM, TTS를 이어 붙인 파이프라인이다.
+핵심: LLM을 중심으로 Vision, 이미지 생성, STT, TTS 등의 모델을 연결해 Multimodal 어플리케이션 구현해보기
 - **속담 퀴즈**: 속담 100개 중 무작위 → Images API → 사용자 답 → 정답 여부·점수(`gr.State`) → 다음 문제. "글자 없이 그려줘"라고 안 하면 정답이 그림에 글자로 박힐 수 있다. "우물 안 개구리"는 쉽고 "모르면 약이요, 아는 게 병"은 거의 불가능하다.
 - **그림판 Artist**: ImageEditor composite → Base64 → Vision(I2T)으로 설명과 화가용 프롬프트 → Images API(T2I) → 파일로 저장해 출력
 - **통역기**: 마이크 → Transcription → LLM 번역(Dropdown 언어를 instructions에) → TTS → 글과 소리
