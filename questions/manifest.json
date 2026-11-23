@@ -10,7 +10,8 @@
     "detection.md",
     "segpose.md",
     "vit.md",
-    "llm.md"
+    "llm.md",
+    "multimodal.md"
   ],
   "notes": [
     "notes/basics.md",
@@ -23,6 +24,7 @@
     "notes/detection.md",
     "notes/segpose.md",
     "notes/vit.md",
-    "notes/llm.md"
+    "notes/llm.md",
+    "notes/multimodal.md"
   ]
 }
