@@ -232,6 +232,8 @@ main { min-width: 0; }
 .ty.ty-생각해보기, .chip[aria-pressed="true"].ty-생각해보기 { background: var(--lv-exp-bg); border-color: var(--lv-exp); color: var(--lv-exp); }
 .ty.ty-OX, .ty.ty-계산, .chip[aria-pressed="true"].ty-OX, .chip[aria-pressed="true"].ty-계산 { background: var(--surface); border-color: var(--muted); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .key { margin: 0 0 8px; font-weight: 600; color: var(--accent); }
+.key strong { font-weight: 800; }
+.key code { font-family: var(--font-mono); font-size: 0.86em; font-weight: 500; background: var(--code-bg); border-radius: 4px; padding: 1px 5px; }
 
 /* ---------- concept note ---------- */
 .note { display: grid; gap: 40px; }
@@ -399,6 +401,10 @@ main { min-width: 0; }
     });
     box.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
     return box.innerHTML;
+  }
+
+  function mdInline(text) {
+    return window.marked ? window.marked.parseInline(text || "", { gfm: true }) : esc(text || "");
   }
 
   function splitLines(text) {
@@ -638,7 +644,7 @@ main { min-width: 0; }
               <span class="step-no">${i + 1}</span>
               <div class="step-body">
                 <h4>${esc(s.title)}</h4>
-                ${s.key ? `<p class="key">${esc(s.key)}</p>` : ""}
+                ${s.key ? `<p class="key">${mdInline(s.key)}</p>` : ""}
                 <div class="md">${md(s.body)}</div>
                 ${s.problem ? `<p class="block"><b>막힌 점</b><span>${esc(s.problem)}</span></p>` : ""}
                 ${s.related.length ? `<div class="rel"><span>면접 질문</span>${relLinks(s.related)}</div>` : ""}

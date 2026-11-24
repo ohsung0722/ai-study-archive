@@ -230,19 +230,37 @@ related: tool-mcp, tool-calling-vs-mcp
 - **생태계**: 직접 구현할 필요 없이 이미 Github 등에 개발된 MCP 서버를 연결해 활용하는 것도 가능 (다만 서버의 신뢰성, 접근 권한, 개인정보 등 확인 필요)
 막힌 점: 표준이라면 누가 어떤 역할을 맡고, 그 사이에 무엇을 주고받는지가 정해져 있어야 한다.
 
-### Host, Client, Server와 주고받는 메시지
+### MCP Architecture: Host, Client, Server
 related: tool-mcp-architecture, tool-mcp-protocol, tool-mcp-primitives
-핵심: MCP에서 Host는 사용자가 쓰는 AI 앱, Client는 Host 안에서 서버 하나와 1:1로 연결을 맡는 부품, Server는 기능을 제공하는 프로그램이며, Client와 Server는 JSON-RPC 2.0 메시지로 도구 목록을 묻고 도구를 실행한다.
-- **Host**: ChatGPT, Claude Desktop, 실습의 client.py. 모델과 대화하고 도구 호출을 처리한다.
-- **Client**: Host 안의 연결 담당. 서버가 세 개면 Client도 세 개다. 강의 자료는 모델을 예로 들었지만, MCP 문서 기준으로는 Host 안의 부품이다.
-- **Server**: Google 검색 MCP 서버, 실습의 미니 플래너 서버
-- **메시지(보충)**: 연결하면 `initialize`로 버전과 지원 기능(capabilities)을 맞추고, `tools/list`로 목록을 받고, `tools/call`로 실행한다.
+핵심: MCP는 Host, Client, Server로 구성. Host는 사용자가 이용하는 AI 어플리케이션, Client는 Host 안에서 서버 하나와 1:1로 연결 및 통신 담당, Server는 외부 도구(Tool)와 데이터 제공, Client와 Server는 JSON-RPC 2.0 형식의 메시지로 도구 목록을 찾고 도구를 실행한다.
+- **Host**: ChatGPT, Claude Desktop과 같은 AI 어플리케이션. 모델과 대화하고 도구 호출을 처리.
+- **Client**: Host 내부에서 특정 MCP Server와 1:1 연결 담당. Server가 세 개면 Client도 세 개.
+- **Server**: 외부 도구. Google 검색 MCP 서버 등
+- **메시지**: 연결하면 `initialize`로 버전과 지원 기능(capabilities)을 맞추기 -> `tools/list`로 목록 받기 -> `tools/call`로 실행.
 ```json
-{"jsonrpc": "2.0", "id": 2, "method": "tools/call",
- "params": {"name": "recommend_activity", "arguments": {"weather": "비"}}}
+{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+        "name": "recommend_activity",
+        "arguments": {
+            "weather": "비"
+        }
+    }
+}
 ```
-- **서버가 줄 수 있는 세 가지(보충)**: Tools(모델이 골라 호출), Resources(앱이 맥락으로 붙이는 읽기용 데이터), Prompts(사용자가 고르는 템플릿). 블로그 실습은 Tools만 썼다.
-막힌 점: 이 규격을 지키는 서버를 만들려면 JSON-RPC 메시지와 스키마를 손으로 다 짜야 할까?
+- **MCP Server가 줄 수 있는 세 가지**: Tools(모델이 골라 호출), Resources(앱이 맥락으로 붙이는 읽기용 데이터), Prompts(사용자가 고르는 템플릿). 
+- MCP를 활용한 Tool Calling 과정
+    1. Host가 MCP Client를 통해 MCP Server에 연결
+    2. initialize를 통해 프로토콜 버전과 지원 기능 확인
+    3. tools/list를 호출하여 Server가 제공하는 도구 목록 및 명세 조회
+    4. Host가 조회한 도구 명세를 LLM에 전달
+    5. LLM이 사용자 요청을 분석하여 Tool Call 생성
+    6. Host가 MCP Client를 통해 tools/call 요청 전송
+    7. MCP Server가 해당 도구를 실행하고 결과 반환
+    8. Host가 실행 결과를 LLM에 전달하여 최종 답변 생성 또는 추가 도구 호출
+막힌 점: 이 프로토콜을 지키는 서버를 만들려면 JSON-RPC 메시지와 스키마 등의 통신 로직을 손으로 다 짜야 할까?
 
 ### FastMCP로 서버 만들기: 함수가 곧 도구
 related: tool-fastmcp-decorator, tool-good-bad-tool, tool-mini-planner-exp
