@@ -44,7 +44,7 @@ related: tool-tool-call, tool-custom-vs-builtin, tool-knowledge-cutoff
 - **Agent**: LLM + Tools
 막힌 점: 모델은 텍스트만 만드는 모델인데, 어떻게 함수를 "부른다"는 걸까?
 
-### Function Calling: 모델은 제안서만 쓴다
+### Function Calling: 모델은 제안서만 작성
 related: tool-function-calling-flow, tool-custom-vs-builtin
 핵심: Function Calling은 모델이 함수를 실행하는 것이 아니라, 필요한 함수 이름과 인자를 JSON으로 적은 제안서(tool call)를 돌려주고 실제 실행은 개발자 코드가 맡는 방식.
 - **여섯 단계**:
@@ -77,7 +77,7 @@ related: tool-function-calling-flow, tool-custom-vs-builtin
 
 ### JSON Schema: 모델이 읽는 도구 설명서
 related: tool-json-schema, tool-good-bad-tool, tool-structured-outputs-vs-fc
-핵심: 도구는 이름(name), 설명(description), 파라미터(parameters), 필수 인자(required)를 정해진 틀에 채운 JSON Schema로 모델에게 전달되며, 모델이 도구에 대해 아는 것은 이 설명서가 전부다.
+핵심: 도구(tool)는 이름(name), 설명(description), 파라미터(parameters), 필수 인자(required) 등을 정해진 틀에 채운 JSON Schema로 모델에게 전달한다.
 ```py
 tools = [
   {"type": "function",
@@ -93,12 +93,12 @@ tools = [
   }
 ]
 ```
-- **name**: 모델이 제안서에 적을 함수 이름
-- **description**: 도구가 필요한지 판단하는 근거. 강의에서 "매우매우 중요하다"고 두 번 강조했다. 엉성하면 써야 할 때 안 쓰고, 쓰지 말아야 할 때 쓴다.
-- **parameters**: 인자 이름, 타입, 인자별 설명. 예시 값('서울')은 모델이 값을 어떤 모양으로 채울지 알려 준다.
+- **name**: 모델이 Tool Call을 생성할 때 사용할 함수 이름
+- **description**: 도구가 필요한지 판단하는 근거. 엉성하면 써야 할 때 안 쓰고, 쓰지 말아야 할 때 쓰게 된다.
+- **parameters**: 인자 이름, 타입, 인자별 설명. 예시 값('서울')은 모델이 값을 어떤 모양으로 채울지 명시
 - **required**: 반드시 채워야 하는 인자
 - **도구 정의도 프롬프트다**: 정의는 모델 입력에 들어가 입력 토큰으로 계산된다. 보충: `"strict": true`를 주면 인자가 스키마를 정확히 따르도록 강제된다.
-- **비유**: 이력서 양식. 서류 심사에서 이력서만 보고 판단하듯, 모델도 스키마만 보고 도구를 판단한다.
+
 막힌 점: 모델이 설명서를 보고 제안서를 냈다. 개발자는 이걸 받아 무엇을 해서 어떻게 돌려줘야 할까?
 
 ### 실행하고 돌려보내기: call_id로 짝 맞추기
