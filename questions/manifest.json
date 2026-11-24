@@ -11,7 +11,8 @@
     "segpose.md",
     "vit.md",
     "llm.md",
-    "multimodal.md"
+    "multimodal.md",
+    "tools.md"
   ],
   "notes": [
     "notes/basics.md",
@@ -25,6 +26,7 @@
     "notes/segpose.md",
     "notes/vit.md",
     "notes/llm.md",
-    "notes/multimodal.md"
+    "notes/multimodal.md",
+    "notes/tools.md"
   ]
 }
