@@ -75,7 +75,7 @@ related: tool-function-calling-flow, tool-custom-vs-builtin
     - 오류 처리: 함수 실행 중 발생한 예외나 잘못된 요청 처리
 막힌 점: 모델은 함수 코드를 볼 수 없다. 어떤 함수가 있고, 언제 쓰고, 무엇을 넣어야 하는지 어떻게 알까?
 
-### JSON Schema: 모델이 읽는 도구 설명서
+### JSON Schema: 모델이 읽는 도구 명세서
 related: tool-json-schema, tool-good-bad-tool, tool-structured-outputs-vs-fc
 핵심: 도구(tool)는 이름(name), 설명(description), 파라미터(parameters), 필수 인자(required) 등을 정해진 틀에 채운 JSON Schema로 모델에게 전달한다.
 ```py
@@ -99,35 +99,52 @@ tools = [
 - **required**: 반드시 채워야 하는 인자
 - **도구 정의도 프롬프트다**: 정의는 모델 입력에 들어가 입력 토큰으로 계산된다. 보충: `"strict": true`를 주면 인자가 스키마를 정확히 따르도록 강제된다.
 
-막힌 점: 모델이 설명서를 보고 제안서를 냈다. 개발자는 이걸 받아 무엇을 해서 어떻게 돌려줘야 할까?
+막힌 점: 모델이 명세서를 보고 제안서를 냈다. 개발자는 이걸 받아 무엇을 해서 어떻게 돌려줘야 할까?
 
-### 실행하고 돌려보내기: call_id로 짝 맞추기
+### Function Calling 실행 및 결과: call_id
 related: tool-call-id, tool-get-weather-exp, tool-validate-arguments
-핵심: 개발자 코드는 function_call 항목의 문자열 인자를 파싱해 함수를 실행하고, 결과를 같은 call_id를 단 function_call_output 항목으로 만들어 제안서와 함께 다시 모델에게 보낸다.
+핵심: 개발자 코드는 function_call 항목의 문자열 인자를 파싱해 함수를 실행하고, 결과를 같은 call_id를 단 function_call_output 항목으로 만들어 명세서와 함께 다시 모델에게 보낸다.
 ```py
-messages = []
+messages = [
+    {"role": "user", "content": "서울의 현재 날씨를 알려줘."}
+]
+
 for item in response.output:
     if item.type == "function_call":
-        args = json.loads(item.arguments)      # '{"city":"서울"}' → {'city': '서울'}
-        result = get_weather(**args)           # {'city': '서울', 'temperature': 34}
-        messages.append(item)                  # 모델이 쓴 제안서
-        messages.append({"type": "function_call_output",
-                         "call_id": item.call_id,
-                         "output": str(result)})
+        # JSON 문자열을 Python 딕셔너리로 변환
+        args = json.loads(item.arguments)
 
-response = client.responses.create(model="gpt-4o-mini", tools=tools, input=messages)
+        # 함수 실행
+        result = get_weather(**args)
+
+        # 모델이 반환한 함수 호출 요청 추가
+        messages.append(item)
+
+        # 함수 실행 결과 추가
+        messages.append({
+            "type": "function_call_output",
+            "call_id": item.call_id,
+            "output": json.dumps(result, ensure_ascii=False)
+        })
+
+# 함수 실행 결과를 모델에 전달
+response = client.responses.create(
+    model="gpt-4o-mini",
+    tools=tools,
+    input=messages
+)
+
+print(response.output_text)
 ```
-- **arguments는 문자열**: 모델이 만드는 건 결국 텍스트라 JSON처럼 생긴 문자열이 온다. 실제로 돌려 보니 `<class 'str'>`이 `json.loads()` 뒤에 `<class 'dict'>`가 됐다.
-- **결과도 문자열로**: `"output": str(result)`
-- **call_id로 짝**: 같은 번호여야 모델이 "내가 부탁한 그 호출의 결과"로 알아본다.
-- **최종 답**: "서울의 현재 온도는 34도입니다. 더 궁금한 점이 있으면 말씀해 주세요!" (강의 자료)
-- **원래 질문도 넣기**: API는 이전 호출을 기억하지 않으니, messages 맨 앞에 `{"role": "user", ...}`를 넣어 두면 모델이 질문을 다시 보고 답할 수 있다.
-- **인자는 검사한다**: 모의 함수는 `cities[city]`라서 사전에 없는 "부산"이 오면 KeyError가 난다. 예외를 잡아 오류를 결과로 돌려주면 모델이 사용자에게 설명할 수 있다.
+- **arguments는 문자열**: 모델이 만드는 건 결국 텍스트라 JSON처럼 생긴 문자열이 온다. 파이썬 함수에 넣기 위해 dict로 파싱해야 함
+- **결과도 문자열로**: `"output": json.dumps(result)` (dict 자료형을 str로 만드는 함수)
+- **call_id로 짝맞추기**: 같은 번호여야 모델이 "내가 부탁한 그 호출의 결과"로 인지.
+- **원래 질문도 넣기**: API는 이전 호출을 기억하지 않으니, messages 맨 앞에 `{"role": "user", ...}`를 넣어 두거나 `previous_response_id` 속성을 활용하면 모델이 질문을 다시 보고 답할 수 있다.
 막힌 점: 도구마다 함수를 만들고, 실행하고, 결과를 돌려보내야 할까? 웹 검색처럼 흔한 도구는 이미 만들어져 있지 않을까?
 
 ### Built-in Tool: 실행까지 OpenAI 서버에서
 related: tool-custom-vs-builtin, tool-choice, tool-many-tools
-핵심: Built-in Tool은 OpenAI가 미리 만들어 서버에 둔 도구로, `tools`에 한 줄만 넣으면 실행부터 결과 반영까지 OpenAI 서버가 처리해 한 번의 요청으로 최종 답이 온다.
+핵심: Built-in Tool은 OpenAI가 미리 만들어 서버에 둔 도구로, `tools`에 한 줄만 넣으면 실행부터 결과 반영까지 OpenAI 서버가 처리해 한 번의 요청으로 최종 답이 반환.
 ```py
 response = client.responses.create(
     model="gpt-4o-mini",
@@ -137,32 +154,44 @@ response = client.responses.create(
 print(response.output_text)
 ```
 - **종류**: web_search(실시간 웹 검색), file_search(올려 둔 문서 벡터 검색, RAG), code_interpreter(샌드박스 파이썬 실행), image_generation, computer_use, remote MCP, tool_search(도구가 많을 때 이번 턴에 필요한 것만 불러오기)
-- **장점**: 함수도, 제안서를 받아 실행하는 코드도 필요 없다. 강의 화면에서는 최저·최고기온과 강수 전망을 출처 링크와 함께 정리해 줬다.
+- **장점**: 함수도, 어플리케이션 코드도 필요 없다.
 - **단점**: 커스터마이징이 안 되고, OpenAI 서버에 의존하고, 추가 비용이 든다.
-- **섞어 쓰기, 운세봇**: 오늘 날짜는 function tool, 운세는 web_search. "생년월일과 성별을 모두 받기 전에는 검색하지 마라"는 instructions에 적는다.
-- **더 확실히 통제하려면(보충)**: `tool_choice`로 `"auto"`(기본), `"required"`, `"none"`, 특정 함수 강제를 고를 수 있다.
-막힌 점: 날씨처럼 실제 데이터를 가져오는 Custom 도구를 만들려면, 도구 함수 안에서 인터넷의 API를 불러야 한다.
+- **섞어 쓰기, 운세봇**: 오늘 날짜는 function tool, 운세는 web_search. "생년월일과 성별을 모두 받기 전에는 검색하지 마라"는 instructions에 기입.
+- **더 확실히 통제하려면(보충)**: `tool_choice`로 `"auto"`(기본), `"required"`, `"none"`, 특정 함수 강제를 선택할 수도 있음.
+막힌 점: 날씨처럼 실제 데이터를 가져오는 Custom 도구를 만들려면, 도구 함수 안에서 외부 API를 불러야 한다.
 
 ### requests와 HTTP: 도구 안에서 인터넷 부르기
 related: tool-http, tool-open-meteo-exp
-핵심: HTTP는 컴퓨터끼리 데이터를 주고받는 대화 규칙이고, requests는 파이썬 코드로 HTTP 요청(URL, Method, Headers, Body)을 보내고 응답(Status Code, Headers, Body)을 받는 라이브러리다.
+핵심: **HTTP**는 컴퓨터끼리 데이터를 주고받는 대화 규칙, **requests**는 파이썬 코드로 HTTP 요청(URL, Method, Headers, Body)을 보내고 응답(Status Code, Headers, Body)을 받는 라이브러리.
 - **요청의 구성 (편지 비유)**: URL = 받는 사람 주소, Method = 편지의 목적, Headers = 봉투에 적은 메모, Body = 편지 내용물
-- **메서드**: GET 조회, POST 생성, PUT/PATCH 수정, DELETE 삭제. 이번 수업은 GET만 썼다.
-- **URL 읽기**: `?` 뒤가 파라미터, 파라미터끼리는 `&`로 잇는다. `params`에 딕셔너리를 넘기면 requests가 만들어 준다.
+- **Method**: GET 조회, POST 생성, PUT/PATCH 수정, DELETE 삭제. 
+- **URL 읽기**: `?` 뒤가 파라미터, 파라미터끼리는 `&`로 연결. requests는 params에 딕셔너리를 전달하면 자동으로 Query Parameter를 구성해줌
 ```py
+import requests
+
 url = "https://api.open-meteo.com/v1/forecast"
-params = {"latitude": 37.57, "longitude": 126.98, "current": "temperature_2m"}
+
+params = {
+    "latitude": 37.57,
+    "longitude": 126.98,
+    "current": "temperature_2m"
+}
+
 response = requests.get(url, params=params)
-response.status_code                          # 200
-response.json()["current"]["temperature_2m"]  # -0.6 (2026년 11월 24일 아침)
+
+# HTTP 상태 코드 확인
+print(response.status_code)
+
+# 응답 데이터에서 현재 기온 추출
+print(response.json()["current"]["temperature_2m"])
 ```
-- **API 호출 체크리스트**: Base URL(endpoint) → HTTP 메서드 → 필수 파라미터 → 인증 필요 여부
-- **보이지 않는 정보**: requests는 헤더에 `User-Agent: python-requests/2.34.2`를 알아서 붙였다. 서버는 브라우저가 아니라 파이썬에서 온 요청임을 안다.
+- **API 호출 체크리스트**: Base URL(endpoint) → HTTP 메서드 → 필수 파라미터 → 인증 필요 여부(Authentication)
+- **보이지 않는 정보**: requests는 헤더에 `User-Agent: python-requests/2.34.2`를 자동으로 붙임. 필요한 경우 headers 파라미터를 통해 인증 정보나 기타 헤더 설정 가능
 막힌 점: 요청이 실패하거나 엉뚱한 응답이 오면 코드는 그걸 어떻게 알아챌까?
 
-### 상태 코드와 바깥 세계의 함정
+### 상태 코드와 외부 API 예외 처리
 related: tool-http, tool-open-meteo-exp, tool-error-handling
-핵심: 상태 코드는 요청이 성공했는지, 실패했다면 요청 쪽(4xx)과 서버 쪽(5xx) 중 어디 문제인지 알려 주는 숫자지만, 원하는 데이터가 왔다는 것까지 보장하지는 않는다.
+핵심: 상태 코드는 요청이 성공했는지(2xx), 실패했다면 요청 쪽(4xx)과 서버 쪽(5xx) 중 어디 문제인지 알려 주는 숫자
 
 | 코드 | 뜻 | 강의 비유 |
 |---|---|---|
@@ -172,38 +201,33 @@ related: tool-http, tool-open-meteo-exp, tool-error-handling
 | 404 | 그런 주소가 없음 | 그런 메뉴는 없음 |
 | 500 | 서버 내부 오류 | 주방에서 불 남 |
 
-- **401과 403은 다르다(보충)**: 401은 "누구신지 모르겠다"(인증 정보 없음, 틀림), 403은 "누군지 알지만 안 된다"(권한 없음). 강의 비유는 둘을 묶었다.
-- **직접 받아 본 실패**: 위도 999 → 400과 `Latitude must be in range of -90 to 90°. Given: 999.0.`, 변수 오타 `temprature_2m` → 400, 주소 오타 `forcast` → 404
-- **200의 함정**: 파라미터 없이 보내면 200인데 본문 길이가 0이라 `json()`에서 JSONDecodeError가 났다.
-- **시간대 함정**: `timezone`이 `GMT`, `time`이 `2026-11-24T00:15`로 왔다. 한국 시간은 09:15다. `timezone="Asia/Seoul"`을 넣어야 한다.
-- **도구 코드로 옮기면**: `timeout`을 걸고, 상태 코드와 본문을 모두 확인하고, 400의 오류 메시지는 모델에게 돌려줘 인자를 고치게 하고, 일시적 오류(타임아웃, 5xx, 429)만 몇 번 재시도한다.
-막힌 점: 이제 날씨 API를 도구로 감쌀 수 있다. 그런데 사용자의 말("서울")과 API가 받는 입력(위도·경도)이 다르면 어떻게 할까?
+- **401과 403은 다르다**: 401은 인증 정보가 없어 요청자를 인증할 수 없는 상태, 403은 요청은 이해했지만 정책이나 권한 등으로 요청을 거부한 상태
+- **200의 함정**: 상태 코드가 200이어도 본문이 비어있으면 JSONDecodeError 발생 가능
+- **도구 코드로 옮기면**: `timeout`을 걸고, 상태 코드와 본문을 모두 확인하고, 400의 오류 메시지는 모델에게 돌려줘 인자를 고치게 하고, 일시적 오류(타임아웃, 5xx, 429)만 재시도.
+막힌 점: 실습해보기
 
 ### 날씨 챗봇: 외부 API를 도구로 감싸기
 related: tool-geocoding-exp, tool-good-bad-tool, tool-validate-arguments
 핵심: 외부 API를 도구로 만들 때는 API가 받는 형식과 사용자의 말 사이의 차이를 코드(geocoding 호출)와 도구 설명(description)으로 메워야 한다.
-- **흐름**: 도시 이름 → geocoding API로 위도·경도 → 날씨(온도, 습도) → OpenAI Tool로 연결 → Gradio Chatbot
-- **직접 확인한 제약**: `Seoul`은 서울특별시(37.566, 126.978)를 찾았지만 `서울`은 결과가 0개였다. 강의 자료의 "도시명은 영문만 인식한다"가 사실이었다.
-- **해결**: description에 "도시 이름은 영어로 넣는다"고 적으면 모델이 tool call을 만들 때 `{"city": "Seoul"}`로 바꿔 넣는다. 번역은 LLM이 원래 잘하는 일이다.
-- **강의 화면의 대화**: "한국의 수도는 어디야?" → "서울입니다", "거기 날씨는 어때?" → "약 29.2도, 습도 68%", "내일은 그거보다 3도 더 덥대" → "32.2도". "거기"는 대화 맥락, 32.2는 도구 값에 3을 더한 모델의 계산이다.
-- **코드로 보완**: 결과가 0개면 "영어 도시 이름으로 다시 시도"라는 메시지를 돌려주고, 후보가 여러 개면 되묻게 한다.
+- **흐름**: 도시 이름 → geocoding API로 위도·경도 → 날씨(온도, 습도) → OpenAI Tool로 연결 → Chatbot
 막힌 점: 이 날씨 도구를 다른 앱에서도 쓰려면? 앱마다 스키마와 실행 코드를 다시 붙여야 하고, 앱과 서비스가 늘수록 연결 코드는 곱으로 늘어난다.
 
 ### MCP: 도구 연결을 표준으로
 related: tool-mcp, tool-calling-vs-mcp
-핵심: MCP(Model Context Protocol)는 AI 앱이 외부 도구와 데이터에 연결하는 방법을 하나로 맞춘 표준 규격으로, 서비스는 MCP 서버를 한 번 만들고 앱은 MCP 클라이언트만 지원하면 어떤 조합이든 연결된다.
-- **공개**: 2024년 말 Anthropic. 강의에서는 "AI계의 USB-C"라고 소개했다.
-- **N×M → N+M**: 앱 5개와 서비스 6개면 표준 없이 30개, MCP로 11개. 20개씩이면 400개 대 40개
-- **이전과 이후**: 웹 검색이 없으면 다른 서비스를 구독하거나 기다리던 것이, Naver 검색 MCP 서버, Google 검색 MCP 서버를 다는 것으로 바뀐다. 모델은 그대로 두고 기능만 붙인다.
+핵심: MCP(Model Context Protocol)는 AI 앱이 외부 도구와 데이터에 연결하는 방법을 표준화한 프로토콜로, 서비스는 MCP 서버를 한 번 만들고 앱은 MCP 클라이언트만 지원하면 서비스마다 별도의 연동 코드를 작성하지 않아도 연결 가능.
+- **공개**: 2024년 말 Anthropic. "AI계의 USB-C".
+- **N×M → N+M**: 앱 5개와 서비스 6개면 MCP 없이 30개(각 어플리케이션에서 모든 외부 서비스로 개별적 연동 필요), MCP는 11개(어플리케이션은 MCP 클라이언트를, 서비스는 MCP 서버를 구현하면 끝). 
+- **이전과 이후**: LLM 자체를 변경하거나 추가 학습을 하지 않아도, 외부 도구를 연결해 새로운 기능 제공 가능
 - **Tool Calling과의 관계**: Tool Calling은 모델이 도구를 사용하는 것, MCP는 그 도구를 표준화해서 연결하는 방법이다. 경쟁이 아니라 층이 다르다.
 
-| Tool Calling | MCP |
-|---|---|
-| LLM이 외부 도구를 호출하는 메커니즘 | 도구를 제공하는 표준 연결 규격 |
-| 함수와 실행 로직을 직접 연결 | 여러 앱·Agent에서 같은 도구를 재사용 |
-| 한 프로젝트에서 간단히 | 인증, 권한, 배포를 중앙에서 관리 |
+| 구분 |Tool Calling | MCP |
+|---|---|---|
+| 목적 | LLM이 외부 도구의 호출을 요청 | AI 어플리케이션과 외부 도구를 표준화된 방식으로 연결 |
+| 주요 역할 | 호출할 도구와 전달할 인자 결정 | MCP Client와 MCP Server 간 표준 통신 |
+| 구현 방식 | 개발자가 코드 안에 tools 스키마와 실행 코드 직접 작성 및 연결 | 이미 만들어진 MCP 서버를 설정 파일에 주소/명령어만 등록하면 바로 연결 |
+| 재사용성 | 내 프로젝트 코드 안에 종속 (다른 앱에 쓰려면 코드 복사 필요) | 한번 MCP 서버로 만들면 어디든 재사용 가능 |
 
-- **생태계**: 남이 만든 MCP 서버는 smithery, GitHub에 많다.
+- **생태계**: 직접 구현할 필요 없이 이미 Github 등에 개발된 MCP 서버를 연결해 활용하는 것도 가능 (다만 서버의 신뢰성, 접근 권한, 개인정보 등 확인 필요)
 막힌 점: 표준이라면 누가 어떤 역할을 맡고, 그 사이에 무엇을 주고받는지가 정해져 있어야 한다.
 
 ### Host, Client, Server와 주고받는 메시지
